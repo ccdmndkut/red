@@ -1,0 +1,221 @@
+/* ============================================= */
+/* === SECTION 1: CORE & BASE STYLES         === */
+/* ============================================= */
+
+:root {
+    /* Enhanced Color Palette */
+    --bg-primary: #121212;
+    --bg-secondary: #1e1e1f;
+    --bg-tertiary: #252527;
+    --bg-selected: #2d3748;
+    /* Background for selected items */
+    --border-color: #36373a;
+    --text-primary: #e2e8f0;
+    --text-secondary: #a0aec0;
+    --accent-primary: #4f9eed;
+    --accent-primary-hover: #63aeff;
+    --accent-glow: rgba(79, 158, 237, 0.15);
+    --error-color: #ff4500;
+    --input-bg: #2d2d2f;
+    --input-border: #444;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+
+    /* iOS Safe Areas */
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+}
+
+* {
+    -webkit-tap-highlight-color: transparent;
+    /* Remove tap highlight on iOS */
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scrolling on iOS */
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: calc(20px + var(--safe-area-inset-top)) calc(20px + var(--safe-area-inset-right)) calc(20px + var(--safe-area-inset-bottom)) calc(20px + var(--safe-area-inset-left));
+    line-height: 1.6;
+    overscroll-behavior: none;
+    /* Prevent pull-to-refresh */
+}
+
+.container {
+    max-width: 850px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+h2,
+h3,
+h4,
+h5 {
+    color: var(--text-primary);
+    /* Basic heading color */
+    margin-top: 0;
+    /* Consistent top margin */
+    margin-bottom: 0.5em;
+    /* Default bottom margin */
+}
+
+h2 {
+    font-size: 1.8rem;
+}
+
+h3 {
+    font-size: 1.4rem;
+}
+
+h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Bolder h4 for titles */
+h5 {
+    font-size: 1rem;
+}
+
+a {
+    color: var(--accent-primary);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+    color: var(--accent-primary-hover);
+}
+
+/* Prevent iOS from zooming on form fields */
+input,
+select,
+textarea,
+button {
+    font-size: 16px;
+}
+
+/* Base Media Query for Mobile Padding/Sizing */
+@media (max-width: 767px) {
+    body {
+        padding: calc(10px + var(--safe-area-inset-top)) calc(10px + var(--safe-area-inset-right)) calc(10px + var(--safe-area-inset-bottom)) calc(10px + var(--safe-area-inset-left));
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    h3 {
+        font-size: 1.2rem;
+    }
+}
+
+
+/* --- Comments --- */
+.comment-section {
+    margin-top: 20px;
+    /* Space above comments */
+    /* border-top: 1px solid var(--border-color); */
+    /* Handled by wrapper div now */
+    /* padding-top: 15px; */
+    /* Handled by wrapper div now */
+    background-color: var(--bg-tertiary);
+    padding: 15px;
+    border-radius: 6px;
+}
+
+.comment {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.comment:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.comment-meta {
+    font-size: 0.8em;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.comment-meta span+span::before {
+    content: "•";
+    margin: 0 5px;
+}
+
+.comment-meta a {
+    /* Style links within comment meta */
+    color: var(--text-secondary);
+}
+
+.comment-meta a:hover {
+    color: var(--text-primary);
+}
+
+.comment-body {
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    /* Preserve formatting */
+    word-wrap: break-word;
+    color: var(--text-primary);
+    line-height: 1.5;
+    /* Improve readability */
+}
+
+/* --- Loading Placeholders --- */
+.loading-placeholder {
+    background-color: var(--bg-tertiary);
+    border-radius: 4px;
+    min-height: 1.2em;
+    opacity: 0.7;
+    animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 0.7;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+.placeholder-line {
+    margin-bottom: 8px;
+    height: 1em;
+    /* Give placeholder lines a consistent height */
+}
+
+.placeholder-line.short {
+    width: 60%;
+}
+
+/* --- Error Messages --- */
+.error {
+    color: var(--error-color);
+    background-color: rgba(255, 69, 0, 0.1);
+    border: 1px solid var(--error-color);
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    font-size: 0.9em;
+}
