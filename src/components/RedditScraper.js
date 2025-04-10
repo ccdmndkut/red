@@ -31,6 +31,8 @@ function RedditScraper() {
     const [limit, setLimit] = useState(25);
     const [sort, setSort] = useState('hot');
     const [topTimeFrame, setTopTimeFrame] = useState('day');
+    const [afterToken, setAfterToken] = useState(''); // Store the "after" token for pagination
+    const [hasMorePosts, setHasMorePosts] = useState(false); // Flag to indicate if more posts can be loaded
 
     // Gallery State
     const [showGalleryModal, setShowGalleryModal] = useState(false);
@@ -128,27 +130,39 @@ function RedditScraper() {
 
 
     // Fetch Posts from a Subreddit
-    const fetchPosts = useCallback(async () => {
+    const fetchPosts = useCallback(async (loadMore = false) => {
         const sub = subreddit.trim();
         if (!sub) { setError('Please enter a subreddit name.'); return; }
         if (!credentials.clientId || !credentials.clientSecret) { setError('API Credentials required.'); setShowAuthModal(true); return; }
         const numericLimit = parseInt(limit, 10);
         if (isNaN(numericLimit) || numericLimit < 1 || numericLimit > 100) { setError('Post limit must be between 1 and 100.'); return; }
 
-        setIsLoading(true); setError(''); setPosts([]); setSelectedPosts(new Set());
-        setSearchQuery(''); // Clear search when fetching normally
+        if (!loadMore) {
+            setIsLoading(true);
+            setError('');
+            setPosts([]);
+            setSelectedPosts(new Set());
+            setAfterToken(''); // Reset pagination token
+            setHasMorePosts(false);
+            setSearchQuery(''); // Clear search when fetching normally
+        } else {
+            setIsLoading(true);
+            setError('');
+        }
 
-        console.log(`Fetching posts from r/${sub}, Sort: ${sort}, Limit: ${numericLimit}, Timeframe (if top): ${topTimeFrame}`);
+        console.log(`Fetching posts from r/${sub}, Sort: ${sort}, Limit: ${numericLimit}, Timeframe (if top): ${topTimeFrame}${loadMore ? ', After: ' + afterToken : ''}`);
 
         try {
             const accessToken = await getAccessToken();
             const baseRedditUrl = 'https://oauth.reddit.com'; // Use OAuth endpoint
             let apiUrl;
 
+            const afterParam = loadMore && afterToken ? `&after=${afterToken}` : '';
+
             if (sort === 'top' || sort === 'controversial') {
-                apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${numericLimit}&t=${topTimeFrame}&raw_json=1`;
+                apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${numericLimit}&t=${topTimeFrame}${afterParam}&raw_json=1`;
             } else {
-                apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${numericLimit}&raw_json=1`;
+                apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${numericLimit}${afterParam}&raw_json=1`;
             }
 
             const response = await fetch(apiUrl, {
@@ -179,7 +193,7 @@ function RedditScraper() {
             }
 
             // Process posts: Add default states needed by the UI
-            const initialPosts = data.data.children.map(child => ({
+            const newPosts = data.data.children.map(child => ({
                 ...child.data,
                 isExpanded: false,      // For long text expansion
                 comments: [],           // Store fetched comments
@@ -188,8 +202,14 @@ function RedditScraper() {
                 commentsError: null     // Error state for *this* post's comments
             }));
 
-            setPosts(initialPosts);
-            console.log(`Fetched ${initialPosts.length} posts.`);
+            // Store the "after" token for pagination
+            setAfterToken(data.data.after || '');
+            setHasMorePosts(!!data.data.after);
+
+            // Append new posts to existing ones if loading more
+            setPosts(prevPosts => loadMore ? [...prevPosts, ...newPosts] : newPosts);
+
+            console.log(`Fetched ${newPosts.length} posts. ${data.data.after ? 'More available.' : 'No more posts.'}`);
 
         } catch (err) {
             console.error("Fetch posts error:", err);
@@ -200,11 +220,11 @@ function RedditScraper() {
         } finally {
             setIsLoading(false);
         }
-    }, [subreddit, limit, sort, topTimeFrame, credentials, getAccessToken, error]); // Include 'error' dependency? Maybe not needed directly
+    }, [subreddit, limit, sort, topTimeFrame, credentials, getAccessToken, error, afterToken]); // Include afterToken dependency
 
 
     // Search Reddit
-    const searchReddit = useCallback(async () => {
+    const searchReddit = useCallback(async (loadMore = false) => {
         const query = searchQuery.trim();
         if (!query) { setError('Please enter a search query.'); return; }
         if (!credentials.clientId || !credentials.clientSecret) { setError('API Credentials required.'); setShowAuthModal(true); return; }
@@ -223,9 +243,19 @@ function RedditScraper() {
             restrictSr = false; // Do not restrict_sr when searching multiple subs via /r/sub1+sub2/search
         } // 'all' scope uses the global search endpoint
 
-        setIsLoading(true); setError(''); setPosts([]); setSelectedPosts(new Set());
+        if (!loadMore) {
+            setIsLoading(true);
+            setError('');
+            setPosts([]);
+            setSelectedPosts(new Set());
+            setAfterToken(''); // Reset pagination token
+            setHasMorePosts(false);
+        } else {
+            setIsLoading(true);
+            setError('');
+        }
 
-        console.log(`Searching Reddit. Scope: ${searchScope}, Query: "${query}", Sort: ${searchSort}, Limit: ${numericLimit}, Time: ${searchTimeLimit}`);
+        console.log(`Searching Reddit. Scope: ${searchScope}, Query: "${query}", Sort: ${searchSort}, Limit: ${numericLimit}, Time: ${searchTimeLimit}${loadMore ? ', After: ' + afterToken : ''}`);
 
         try {
             const accessToken = await getAccessToken();
@@ -235,18 +265,19 @@ function RedditScraper() {
             const limitParam = `&limit=${numericLimit}`;
             const sortParam = `&sort=${searchSort}`;
             const rawJsonParam = '&raw_json=1';
+            const afterParam = loadMore && afterToken ? `&after=${afterToken}` : '';
             let apiUrl;
 
             if (searchScope === 'subreddit') {
                 // Search within a specific subreddit
-                apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}&restrict_sr=1${limitParam}${sortParam}${timeParam}${rawJsonParam}`;
+                apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}&restrict_sr=1${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
             } else if (searchScope === 'multiple') {
                 // Search within multiple subreddits (no restrict_sr needed here)
-                apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}${limitParam}${sortParam}${timeParam}${rawJsonParam}`;
+                apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
                 // Note: The behavior of sort=relevance might differ across multiple subs vs global search
             } else { // searchScope === 'all'
                 // Search across all of Reddit
-                apiUrl = `${baseRedditUrl}/search?${queryParam}${limitParam}${sortParam}${timeParam}${rawJsonParam}`;
+                apiUrl = `${baseRedditUrl}/search?${queryParam}${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
             }
 
             console.log("Search API URL:", apiUrl);
@@ -288,13 +319,14 @@ function RedditScraper() {
                 commentsError: null
             }));
 
-            setPosts(searchResults);
-            console.log(`Found ${searchResults.length} search results.`);
+            // Store the "after" token for pagination
+            setAfterToken(data.data.after || '');
+            setHasMorePosts(!!data.data.after);
 
-            // Clear main subreddit input if searching 'all' for clarity? Optional.
-            // if (searchScope === 'all') {
-            //     setSubreddit('');
-            // }
+            // Append new posts to existing ones if loading more
+            setPosts(prevPosts => loadMore ? [...prevPosts, ...searchResults] : searchResults);
+
+            console.log(`Found ${searchResults.length} search results. ${data.data.after ? 'More available.' : 'No more results.'}`);
 
         } catch (err) {
             console.error("Search error:", err);
@@ -304,7 +336,7 @@ function RedditScraper() {
         } finally {
             setIsLoading(false);
         }
-    }, [searchQuery, limit, searchScope, subreddit, multipleSubreddits, searchSort, searchTimeLimit, credentials, getAccessToken, error]);
+    }, [searchQuery, limit, searchScope, subreddit, multipleSubreddits, searchSort, searchTimeLimit, credentials, getAccessToken, error, afterToken]);
 
 
     // --- Media Info Helper (Memoized) ---
@@ -1268,8 +1300,10 @@ function RedditScraper() {
             <div className="post-list-container" style={{ marginTop: '10px' }}>
                 {/* Post List Header */}
                 {posts.length > 0 && displayedPosts.length > 0 && (
-                    <div className="post-list-header card">
-                        <h3>Post List ({displayedPosts.length} posts)</h3>
+                    <div className="post-list-header">
+                        <div className="post-list-heading">
+                            <h3>Post List ({displayedPosts.length} shown of {posts.length} loaded posts)</h3>
+                        </div>
                     </div>
                 )}
 
@@ -1421,6 +1455,19 @@ function RedditScraper() {
                     );
                 })}
             </div> {/* End Post List Container */}
+
+            {/* Add Load More button after the post list */}
+            {posts.length > 0 && hasMorePosts && (
+                <div className="load-more-container">
+                    <button
+                        className="load-more-button"
+                        onClick={() => searchQuery.trim() ? searchReddit(true) : fetchPosts(true)}
+                        disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                    >
+                        {isLoading ? 'Loading...' : 'Load More Posts'}
+                    </button>
+                </div>
+            )}
 
         </div> // End Container
     );
