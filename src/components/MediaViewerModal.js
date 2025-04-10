@@ -1,5 +1,6 @@
 // components/MediaViewerModal.js
-import React, { useEffect } from 'react';
+// Use global React from script tags
+const { useEffect } = React;
 
 /**
  * A simple modal for displaying a single image or video.
