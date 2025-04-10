@@ -62,12 +62,43 @@ function RedditScraper() {
     // Add a loading progress state
     const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
 
+    // Add state for back to top button visibility
+    const [showBackToTop, setShowBackToTop] = useState(false);
+
     // --- Effects ---
 
     // Save credentials to localStorage
     useEffect(() => {
         localStorage.setItem('redditApiCredentials', JSON.stringify(credentials));
     }, [credentials]);
+
+    // Handle scroll and show/hide back to top button
+    useEffect(() => {
+        const handleScroll = () => {
+            // Show button when user scrolls down 300px from the top
+            if (window.scrollY > 300) {
+                setShowBackToTop(true);
+            } else {
+                setShowBackToTop(false);
+            }
+        };
+
+        // Add scroll event listener
+        window.addEventListener('scroll', handleScroll);
+
+        // Remove scroll event listener on cleanup
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
+
+    // Scroll to top function
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
 
     // --- API Callbacks ---
 
@@ -1447,6 +1478,25 @@ function RedditScraper() {
                 </div>
             </div> {/* End Main Controls Card */}
 
+            {/* AI Chat Interface */}
+            <AIChatInterface redditData={posts} />
+
+            {/* --- Media Grid --- */}
+            {displayedPosts.length > 0 && mediaFilter !== 'all' && (
+                <div className="card media-grid-container">
+                    <MediaGrid
+                        posts={displayedPosts}
+                        onMediaClick={handleMediaClick}
+                        selectedPosts={selectedPosts}
+                        onSelectMedia={handleSelectPost}
+                        isLoading={isLoading || isCommentsLoading || isMediaDownloading}
+                        type={mediaFilter}
+                        gridSize={gridSize}
+                        getMediaInfo={getMediaInfo} // Pass helper
+                    />
+                </div>
+            )}
+
             {/* --- Action Buttons for Results --- */}
             {posts.length > 0 && (
                 <div className="action-buttons-container card">
@@ -1481,27 +1531,6 @@ function RedditScraper() {
 
             {/* --- Error Display --- */}
             {error && <div className="error card" role="alert">{error} <button onClick={() => setError('')}>×</button></div>}
-
-            {/* --- Media Grid View --- */}
-            {/* Show only if posts exist AND the filter is image or video */}
-            {posts.length > 0 && displayedPosts.length > 0 && (mediaFilter === 'image' || mediaFilter === 'video') && (
-                <div className="card media-grid-section">
-                    <div className="media-grid-header">
-                        <h3>Media Grid ({mediaFilter === 'image' ? 'Images/Galleries' : 'Videos'})</h3>
-                        <div className="grid-controls">
-                            <label htmlFor="gridSizeSlider">Grid Size:</label>
-                            <input id="gridSizeSlider" type="range" className="grid-size-slider" min="100" max="350" step="10" value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))} disabled={isLoading || isCommentsLoading || isMediaDownloading} aria-label="Adjust grid item size" />
-                            <span>{gridSize}px</span>
-                        </div>
-                    </div>
-                    <MediaGrid
-                        posts={displayedPosts} // Pass filtered posts
-                        onOpenMedia={openGallery} // Use gallery opener
-                        gridSize={gridSize}
-                        getMediaInfo={getMediaInfo} // Pass helper
-                    />
-                </div>
-            )}
 
             {/* --- Post List --- */}
             <div className="post-list-container" style={{ marginTop: '10px' }}>
@@ -1685,6 +1714,17 @@ function RedditScraper() {
                         )}
                     </button>
                 </div>
+            )}
+
+            {/* Back to top button */}
+            {showBackToTop && (
+                <button
+                    className="back-to-top-btn"
+                    onClick={scrollToTop}
+                    aria-label="Back to top"
+                >
+                    ↑ TOP
+                </button>
             )}
 
         </div> // End Container
@@ -1966,6 +2006,44 @@ styleTag.textContent = `
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Back to Top Button */
+.back-to-top-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.back-to-top-btn:hover {
+  background-color: var(--primary-darker);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+@media (max-width: 767px) {
+  .back-to-top-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 0.8rem;
+    bottom: 15px;
+    right: 15px;
+  }
 }
 `;
 document.head.appendChild(styleTag);

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WallStreetBets Sentiment Scores Over Time</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        #sentimentChart {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="sentimentChart"></canvas>
+
+    <script>
+        const sentimentData = {
+            "sentiment_scores": [
+                { "time": "2025-04-08 02:00", "score": -1 },
+                { "time": "2025-04-08 05:00", "score": -1 },
+                { "time": "2025-04-08 08:00", "score": -1 },
+                { "time": "2025-04-08 12:00", "score": -1 },
+                { "time": "2025-04-08 14:00", "score": -1 },
+                { "time": "2025-04-08 15:00", "score": -1 },
+                { "time": "2025-04-08 16:00", "score": -1 },
+                { "time": "2025-04-09 17:00", "score": -1 },
+                { "time": "2025-04-09 18:00", "score": 0 },
+                { "time": "2025-04-09 19:00", "score": 1 },
+                { "time": "2025-04-09 20:00", "score": -0.25 },
+                { "time": "2025-04-09 21:00", "score": -0.33 },
+                { "time": "2025-04-09 22:00", "score": 1 },
+                { "time": "2025-04-09 23:00", "score": 0.83 }
+            ]
+        };
+
+        const labels = sentimentData.sentiment_scores.map(entry => entry.time);
+        const scores = sentimentData.sentiment_scores.map(entry => entry.score);
+
+        const ctx = document.getElementById('sentimentChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Sentiment Score (WallStreetBets)',
+                    data: scores,
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time (UTC)'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Sentiment Score'
+                        },
+                        min: -1.5,
+                        max: 1.5,
+                        ticks: {
+                            stepSize: 0.5
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return `Score: ${context.raw}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

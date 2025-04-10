@@ -1,5 +1,3 @@
-import React, { useState } from 'react';
-
 // Define AIChatInterface as a global variable, without any module syntax
 // Use var instead of const/let for maximum compatibility
 var AIChatInterface = function (props) {
@@ -15,7 +13,16 @@ var AIChatInterface = function (props) {
     var userInput = userInputState[0];
     var setUserInput = userInputState[1];
 
-    var apiKeyState = React.useState('');
+    // Load API key from localStorage
+    var apiKeyState = React.useState(function () {
+        try {
+            var savedKey = localStorage.getItem('openRouterApiKey');
+            return savedKey || '';
+        } catch (e) {
+            console.error('Error loading API key from localStorage:', e);
+            return '';
+        }
+    });
     var apiKey = apiKeyState[0];
     var setApiKey = apiKeyState[1];
 
@@ -26,6 +33,28 @@ var AIChatInterface = function (props) {
     var apiKeyVisibleState = React.useState(false);
     var apiKeyVisible = apiKeyVisibleState[0];
     var setApiKeyVisible = apiKeyVisibleState[1];
+
+    // Effect to save API key to localStorage when it changes
+    React.useEffect(function () {
+        try {
+            if (apiKey) {
+                localStorage.setItem('openRouterApiKey', apiKey);
+            }
+        } catch (e) {
+            console.error('Error saving API key to localStorage:', e);
+        }
+    }, [apiKey]);
+
+    // Function to save API key
+    function saveApiKey() {
+        try {
+            localStorage.setItem('openRouterApiKey', apiKey);
+            alert('API key saved successfully!');
+        } catch (e) {
+            console.error('Error saving API key to localStorage:', e);
+            alert('Failed to save API key: ' + e.message);
+        }
+    }
 
     // Helper function to prepare data context
     function prepareDataContext(data) {
@@ -107,68 +136,81 @@ var AIChatInterface = function (props) {
     }
 
     // Create the component UI without JSX
-    return React.createElement('div', { className: 'ai-chat-container' }, [
-        // Title
-        React.createElement('h2', { key: 'title' }, 'Ask AI About This Data'),
+    return React.createElement('div', { className: 'card main-controls ai-chat-section' }, [
+        // Header with title and API key input
+        React.createElement('div', { key: 'header', className: 'app-header' }, [
+            React.createElement('div', { key: 'title-area', className: 'app-title' }, [
+                React.createElement('h2', { key: 'main-title' }, 'AI Chat Assistant'),
+                React.createElement('span', { key: 'subtitle', className: 'app-subtitle' }, 'Analyze Reddit data with AI')
+            ]),
 
-        // API Key input
-        React.createElement('div', { key: 'api-input', className: 'api-key-input' }, [
-            React.createElement('input', {
-                key: 'api-field',
-                type: apiKeyVisible ? 'text' : 'password',
-                placeholder: 'Enter your OpenRouter API key',
-                value: apiKey,
-                onChange: function (e) { setApiKey(e.target.value); },
-                className: 'api-key-field'
-            }),
-            React.createElement('button', {
-                key: 'toggle-btn',
-                onClick: function () { setApiKeyVisible(!apiKeyVisible); },
-                className: 'toggle-visibility-btn'
-            }, apiKeyVisible ? 'Hide' : 'Show')
+            React.createElement('div', { key: 'api-input', className: 'api-key-input' }, [
+                React.createElement('input', {
+                    key: 'api-field',
+                    type: apiKeyVisible ? 'text' : 'password',
+                    placeholder: 'Enter your OpenRouter API key',
+                    value: apiKey,
+                    onChange: function (e) { setApiKey(e.target.value); },
+                    className: 'api-key-field'
+                }),
+                React.createElement('button', {
+                    key: 'toggle-btn',
+                    onClick: function () { setApiKeyVisible(!apiKeyVisible); },
+                    className: 'toggle-visibility-btn'
+                }, apiKeyVisible ? 'Hide' : 'Show'),
+                React.createElement('button', {
+                    key: 'save-btn',
+                    onClick: saveApiKey,
+                    className: 'save-key-btn'
+                }, 'Save Key')
+            ])
         ]),
 
-        // Chat messages
-        React.createElement('div', { key: 'messages', className: 'chat-messages' },
-            chatHistory.length === 0
-                ? [React.createElement('div', { key: 'empty', className: 'empty-chat' }, 'Ask a question about the Reddit data you\'ve scraped!')]
-                : chatHistory.map(function (msg, idx) {
-                    return React.createElement('div', {
-                        key: 'msg-' + idx,
-                        className: 'message ' + msg.role
-                    }, [
-                        React.createElement('strong', { key: 'role' }, msg.role === 'user' ? 'You' : 'AI'),
-                        React.createElement('div', { key: 'content', className: 'message-content' }, msg.content)
-                    ]);
-                }).concat(
-                    isLoading ? [React.createElement('div', { key: 'loading', className: 'loading' }, 'AI is thinking...')] : []
-                )
-        ),
+        // Chat interface
+        React.createElement('div', { key: 'chat-interface', className: 'chat-interface' }, [
+            // Chat messages
+            React.createElement('div', { key: 'messages', className: 'chat-messages' },
+                chatHistory.length === 0
+                    ? [React.createElement('div', { key: 'empty', className: 'empty-chat' }, 'Ask a question about the Reddit data you\'ve scraped!')]
+                    : chatHistory.map(function (msg, idx) {
+                        return React.createElement('div', {
+                            key: 'msg-' + idx,
+                            className: 'message ' + msg.role
+                        }, [
+                            React.createElement('strong', { key: 'role' }, msg.role === 'user' ? 'You' : 'AI'),
+                            React.createElement('div', { key: 'content', className: 'message-content' }, msg.content)
+                        ]);
+                    }).concat(
+                        isLoading ? [React.createElement('div', { key: 'loading', className: 'loading' }, 'AI is thinking...')] : []
+                    )
+            ),
 
-        // Chat input
-        React.createElement('div', { key: 'input-area', className: 'chat-input' }, [
-            React.createElement('textarea', {
-                key: 'input',
-                placeholder: 'Ask about the Reddit data...',
-                value: userInput,
-                onChange: function (e) { setUserInput(e.target.value); },
-                onKeyPress: function (e) {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendMessage();
-                    }
-                },
-                disabled: isLoading,
-                className: 'chat-textarea'
-            }),
-            React.createElement('button', {
-                key: 'send-btn',
-                onClick: sendMessage,
-                disabled: !apiKey || !userInput.trim() || isLoading,
-                className: 'send-button'
-            }, isLoading ? 'Sending...' : 'Send')
+            // Chat input
+            React.createElement('div', { key: 'input-area', className: 'chat-input' }, [
+                React.createElement('textarea', {
+                    key: 'input',
+                    placeholder: 'Ask about the Reddit data...',
+                    value: userInput,
+                    onChange: function (e) { setUserInput(e.target.value); },
+                    onKeyPress: function (e) {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage();
+                        }
+                    },
+                    disabled: isLoading,
+                    className: 'chat-textarea'
+                }),
+                React.createElement('button', {
+                    key: 'send-btn',
+                    onClick: sendMessage,
+                    disabled: !apiKey || !userInput.trim() || isLoading,
+                    className: 'send-button'
+                }, isLoading ? 'Sending...' : 'Send')
+            ])
         ])
     ]);
 };
 
-export default AIChatInterface; 
+// Make the component available globally
+window.AIChatInterface = AIChatInterface; 
