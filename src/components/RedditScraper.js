@@ -1079,8 +1079,6 @@ function RedditScraper() {
 
             {/* --- Main Controls Card --- */}
             <div className="card">
-                <h2>Reddit Scraper Advanced</h2>
-
                 {/* Media Filter Header */}
                 <div className="media-filter-header">
                     <div>
