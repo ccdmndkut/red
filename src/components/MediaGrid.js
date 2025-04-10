@@ -167,4 +167,4 @@ function MediaGrid({ posts, onOpenMedia, gridSize = 240, getMediaInfo }) {
 }
 
 // Make MediaGrid available globally - moved outside the component function
-window.MediaGrid = MediaGrid;
+window.MediaGrid = MediaGrid
