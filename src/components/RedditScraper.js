@@ -1135,165 +1135,216 @@ function RedditScraper() {
             )}
 
             {/* --- Main Controls Card --- */}
-            <div className="card">
-                {/* Media Filter Header */}
-                <div className="media-filter-header">
-                    <div>
-                        <h3>View Filter</h3>
-                        <span className="count-display">
-                            {posts.length > 0 ? `${displayedPosts.length} / ${posts.length} posts shown` : 'No posts loaded'}
-                        </span>
+            <div className="card main-controls">
+                {/* App Header with API Config Button */}
+                <div className="app-header">
+                    <div className="app-title">
+                        <h2>Reddit Content Scraper</h2>
+                        <span className="app-subtitle">Browse, search, and download media from Reddit</span>
                     </div>
-                    <div className="media-filter-options">
-                        {['all', 'image', 'video'].map(filterValue => (
-                            <React.Fragment key={filterValue}>
-                                <input
-                                    type="radio"
-                                    id={`filter${filterValue}`}
-                                    name="mediaFilter"
-                                    value={filterValue}
-                                    checked={mediaFilter === filterValue}
-                                    onChange={(e) => setMediaFilter(e.target.value)}
-                                    disabled={isLoading || isCommentsLoading || isMediaDownloading}
-                                />
-                                <label htmlFor={`filter${filterValue}`}>
-                                    {filterValue === 'all' ? 'All Posts' : filterValue === 'image' ? 'Images & Galleries' : 'Videos'}
-                                </label>
-                            </React.Fragment>
-                        ))}
+                    <button className="api-config-btn" onClick={() => setShowAuthModal(true)} disabled={isLoading || isCommentsLoading || isMediaDownloading} title="Edit API Credentials">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+                        </svg>
+                        API Settings
+                    </button>
+                </div>
+
+                {/* Content Filter Tabs */}
+                <div className="content-filter-tabs">
+                    {['all', 'image', 'video'].map(filterValue => (
+                        <button
+                            key={filterValue}
+                            className={`filter-tab ${mediaFilter === filterValue ? 'active' : ''}`}
+                            onClick={() => setMediaFilter(filterValue)}
+                            disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                        >
+                            {filterValue === 'all' ? (
+                                <><span className="icon">📋</span> All Posts</>
+                            ) : filterValue === 'image' ? (
+                                <><span className="icon">🖼️</span> Images & Galleries</>
+                            ) : (
+                                <><span className="icon">🎬</span> Videos</>
+                            )}
+                        </button>
+                    ))}
+                    <div className="count-badge">
+                        {posts.length > 0 ? `${displayedPosts.length}/${posts.length}` : '0/0'}
                     </div>
                 </div>
 
-                {/* Subreddit Fetch Controls */}
-                <div className="control-section">
-                    <h3>Fetch from Subreddit</h3>
-                    <div className="controls-grid">
-                        <div className="control-group">
-                            <label htmlFor="subredditInput">Subreddit (no r/):</label>
-                            <input
-                                id="subredditInput"
-                                value={subreddit}
-                                onChange={(e) => setSubreddit(e.target.value.replace(/r\/|\s/g, ''))}
-                                placeholder="e.g., pics"
-                                onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
-                                disabled={isLoading || isCommentsLoading || isMediaDownloading}
-                                autoFocus
-                            />
-                        </div>
-                        <div className="control-group">
-                            <label htmlFor="sortSelect">Sort by:</label>
-                            <select id="sortSelect" value={sort} onChange={(e) => setSort(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
-                                <option value="hot">Hot</option>
-                                <option value="new">New</option>
-                                <option value="top">Top</option>
-                                <option value="controversial">Controversial</option>
-                                <option value="rising">Rising</option>
-                            </select>
-                        </div>
-                        {(sort === 'top' || sort === 'controversial') && (
-                            <div className="control-group">
-                                <label htmlFor="timeFrameSelect">Time Frame:</label>
-                                <select id="timeFrameSelect" value={topTimeFrame} onChange={(e) => setTopTimeFrame(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
-                                    <option value="hour">Hour</option>
-                                    <option value="day">Day</option>
-                                    <option value="week">Week</option>
-                                    <option value="month">Month</option>
-                                    <option value="year">Year</option>
-                                    <option value="all">All Time</option>
-                                </select>
+                {/* Main Input Area */}
+                <div className="input-area">
+                    <div className="input-tabs">
+                        <button className={`input-tab ${!searchQuery ? 'active' : ''}`} onClick={() => setSearchQuery('')}>
+                            Browse Subreddit
+                        </button>
+                        <button className={`input-tab ${searchQuery ? 'active' : ''}`} onClick={() => searchQuery ? null : setSearchQuery(' ')}>
+                            Search Reddit
+                        </button>
+                    </div>
+
+                    {/* Conditional rendering based on active tab */}
+                    <div className="input-panel">
+                        {!searchQuery ? (
+                            /* Subreddit Fetch Panel */
+                            <div className="subreddit-panel">
+                                <div className="main-input-row">
+                                    <div className="subreddit-input-group">
+                                        <div className="input-prefix">r/</div>
+                                        <input
+                                            className="main-input"
+                                            value={subreddit}
+                                            onChange={(e) => setSubreddit(e.target.value.replace(/r\/|\s/g, ''))}
+                                            placeholder="Enter subreddit name"
+                                            onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
+                                            disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                            autoFocus
+                                        />
+                                    </div>
+
+                                    <select className="sort-select" value={sort} onChange={(e) => setSort(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
+                                        <option value="hot">🔥 Hot</option>
+                                        <option value="new">🆕 New</option>
+                                        <option value="top">⭐ Top</option>
+                                        <option value="controversial">⚔️ Controversial</option>
+                                        <option value="rising">📈 Rising</option>
+                                    </select>
+
+                                    {(sort === 'top' || sort === 'controversial') && (
+                                        <select value={topTimeFrame} onChange={(e) => setTopTimeFrame(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
+                                            <option value="hour">Last Hour</option>
+                                            <option value="day">Today</option>
+                                            <option value="week">This Week</option>
+                                            <option value="month">This Month</option>
+                                            <option value="year">This Year</option>
+                                            <option value="all">All Time</option>
+                                        </select>
+                                    )}
+
+                                    <div className="limit-input-group">
+                                        <input
+                                            type="number"
+                                            value={limit}
+                                            onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
+                                            min="1" max="100" step="1"
+                                            onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
+                                            disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                        />
+                                        <span className="limit-label">posts</span>
+                                    </div>
+
+                                    <button
+                                        className="fetch-button"
+                                        onClick={fetchPosts}
+                                        disabled={isLoading || isCommentsLoading || isMediaDownloading || !subreddit.trim()}
+                                    >
+                                        {isLoading && !searchQuery ? (
+                                            <><span className="spinner"></span>Loading...</>
+                                        ) : (
+                                            <>Fetch Posts</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div className="extra-options">
+                                    <div className="comment-option">
+                                        <label>Comments:</label>
+                                        <select value={commentLimit} onChange={(e) => setCommentLimit(Number(e.target.value))} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
+                                            <option value="0">None</option>
+                                            <option value="20">Top 20</option>
+                                            <option value="50">Top 50</option>
+                                            <option value="100">Top 100</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Search Panel */
+                            <div className="search-panel">
+                                <div className="main-input-row">
+                                    <input
+                                        className="search-input"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Enter search terms..."
+                                        onKeyDown={(e) => e.key === 'Enter' && searchReddit()}
+                                        disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                    />
+
+                                    <select className="scope-select" value={searchScope} onChange={(e) => setSearchScope(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
+                                        <option value="subreddit">In r/{subreddit || '...'}</option>
+                                        <option value="multiple">Multiple Subreddits</option>
+                                        <option value="all">All of Reddit</option>
+                                    </select>
+
+                                    <button
+                                        className="search-button"
+                                        onClick={searchReddit}
+                                        disabled={isLoading || isCommentsLoading || isMediaDownloading || !searchQuery.trim() || (searchScope === 'subreddit' && !subreddit.trim()) || (searchScope === 'multiple' && !multipleSubreddits.trim().split(',').map(s => s.trim()).filter(s => s).length)}
+                                    >
+                                        {isLoading && searchQuery ? (
+                                            <><span className="spinner"></span>Searching...</>
+                                        ) : (
+                                            <>🔍 Search</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {searchScope === 'multiple' && (
+                                    <div className="multi-sub-row">
+                                        <input
+                                            className="multi-sub-input"
+                                            value={multipleSubreddits}
+                                            onChange={(e) => setMultipleSubreddits(e.target.value)}
+                                            placeholder="Comma-separated subreddits: pics, aww, dataisbeautiful..."
+                                            onKeyDown={(e) => e.key === 'Enter' && searchReddit()}
+                                            disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="search-options">
+                                    <div className="search-option">
+                                        <label>Sort:</label>
+                                        <select value={searchSort} onChange={(e) => setSearchSort(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
+                                            <option value="relevance">Relevance</option>
+                                            <option value="hot">Hot</option>
+                                            <option value="new">New</option>
+                                            <option value="top">Top</option>
+                                            <option value="comments">Most Comments</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="search-option">
+                                        <label>Time:</label>
+                                        <select value={searchTimeLimit} onChange={(e) => setSearchTimeLimit(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
+                                            <option value="all">All Time</option>
+                                            <option value="hour">Past Hour</option>
+                                            <option value="day">Past Day</option>
+                                            <option value="week">Past Week</option>
+                                            <option value="month">Past Month</option>
+                                            <option value="year">Past Year</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="search-option">
+                                        <label>Limit:</label>
+                                        <input
+                                            type="number"
+                                            value={limit}
+                                            onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
+                                            min="1" max="100" step="1"
+                                            disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         )}
-                        <div className="control-group">
-                            <label htmlFor="limitInput">Post Limit (1-100):</label>
-                            <input
-                                id="limitInput" type="number" value={limit}
-                                onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
-                                min="1" max="100" step="1"
-                                onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
-                                disabled={isLoading || isCommentsLoading || isMediaDownloading}
-                            />
-                        </div>
-                        <div className="control-group">
-                            <label htmlFor="commentLimitSelect">Load Comments:</label>
-                            <select id="commentLimitSelect" value={commentLimit} onChange={(e) => setCommentLimit(Number(e.target.value))} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
-                                <option value="20">Top 20</option>
-                                <option value="50">Top 50</option>
-                                <option value="100">Top 100</option>
-                                <option value="0">None</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="action-buttons">
-                        <button onClick={fetchPosts} disabled={isLoading || isCommentsLoading || isMediaDownloading || !subreddit.trim()}>
-                            {isLoading && !searchQuery ? 'Loading...' : `Fetch r/${subreddit || '...'}`}
-                        </button>
-                        <button className="ghost-btn" onClick={() => setShowAuthModal(true)} disabled={isLoading || isCommentsLoading || isMediaDownloading} title="Edit API Credentials">
-                            API Credentials
-                        </button>
                     </div>
                 </div>
-
-                {/* Search Section */}
-                <div className="control-section">
-                    <h3>Search Reddit</h3>
-                    <div className="controls-grid">
-                        <div className="control-group long-span">
-                            <label htmlFor="searchQueryInput">Search Query:</label>
-                            <input id="searchQueryInput" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Enter search terms..." onKeyDown={(e) => e.key === 'Enter' && searchReddit()} disabled={isLoading || isCommentsLoading || isMediaDownloading} />
-                        </div>
-                        <div className="control-group">
-                            <label htmlFor="searchScopeSelect">Search In:</label>
-                            <select id="searchScopeSelect" value={searchScope} onChange={(e) => setSearchScope(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
-                                <option value="subreddit">Current Subreddit</option>
-                                <option value="multiple">Multiple Subs</option>
-                                <option value="all">All Reddit</option>
-                            </select>
-                        </div>
-                        {searchScope === 'multiple' && (
-                            <div className="control-group long-span">
-                                <label htmlFor="multipleSubredditsInput">Subreddits (comma-sep):</label>
-                                <input id="multipleSubredditsInput" value={multipleSubreddits} onChange={(e) => setMultipleSubreddits(e.target.value)} placeholder="e.g. pics, aww, dataisbeautiful" onKeyDown={(e) => e.key === 'Enter' && searchReddit()} disabled={isLoading || isCommentsLoading || isMediaDownloading} />
-                            </div>
-                        )}
-                        <div className="control-group">
-                            <label htmlFor="searchSortSelect">Sort Results By:</label>
-                            <select id="searchSortSelect" value={searchSort} onChange={(e) => setSearchSort(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
-                                <option value="relevance">Relevance</option>
-                                <option value="hot">Hot</option>
-                                <option value="new">New</option>
-                                <option value="top">Top</option>
-                                <option value="comments">Comment Count</option>
-                            </select>
-                        </div>
-                        <div className="control-group">
-                            <label htmlFor="searchTimeLimitSelect">Time Period:</label>
-                            <select id="searchTimeLimitSelect" value={searchTimeLimit} onChange={(e) => setSearchTimeLimit(e.target.value)} disabled={isLoading || isCommentsLoading || isMediaDownloading}>
-                                <option value="all">All Time</option>
-                                <option value="hour">Hour</option>
-                                <option value="day">Day</option>
-                                <option value="week">Week</option>
-                                <option value="month">Month</option>
-                                <option value="year">Year</option>
-                            </select>
-                        </div>
-                        <div className="control-group">
-                            <label htmlFor="searchLimitInput">Result Limit:</label>
-                            <input id="searchLimitInput" type="number" value={limit} onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))} min="1" max="100" step="1" onKeyDown={(e) => e.key === 'Enter' && searchReddit()} disabled={isLoading || isCommentsLoading || isMediaDownloading} />
-                        </div>
-                    </div>
-                    <div className="action-buttons spaced">
-                        <button onClick={searchReddit} disabled={isLoading || isCommentsLoading || isMediaDownloading || !searchQuery.trim() || (searchScope === 'subreddit' && !subreddit.trim()) || (searchScope === 'multiple' && !multipleSubreddits.trim().split(',').map(s => s.trim()).filter(s => s).length)}>
-                            {isLoading && searchQuery ? 'Searching...' : 'Search Reddit'}
-                        </button>
-                        <span className="scope-indicator">
-                            {searchScope === 'subreddit' ? (subreddit.trim() ? `in r/${subreddit}` : 'Requires subreddit') :
-                                searchScope === 'multiple' ? (multipleSubreddits.trim() ? `in specified subs` : 'Requires subs') :
-                                    'across all Reddit'}
-                        </span>
-                    </div>
-                </div>
-
-            </div> {/* End Controls Card */}
+            </div> {/* End Main Controls Card */}
 
             {/* --- Action Buttons for Results --- */}
             {posts.length > 0 && (
@@ -1530,4 +1581,281 @@ function RedditScraper() {
 
 // Make RedditScraper available globally instead of using export
 // The variable 'RedditScraper' will be accessible to other scripts loaded after this one
+window.RedditScraper = RedditScraper;
+
+/* Add this right before the last line of the file */
+// Add styles for the updated UI components
+const styleTag = document.createElement('style');
+styleTag.textContent = `
+.main-controls {
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.app-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-title h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--text-primary);
+}
+
+.app-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.api-config-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background-color: var(--bg-highlight);
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.content-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.filter-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.filter-tab:hover {
+  background: var(--bg-hover);
+}
+
+.filter-tab.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.filter-tab .icon {
+  font-size: 1rem;
+}
+
+.count-badge {
+  position: absolute;
+  right: 0;
+  top: -8px;
+  background-color: var(--bg-highlight);
+  color: var(--text-secondary);
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+.input-area {
+  background-color: var(--bg-card);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.input-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.input-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.input-tab.active {
+  color: var(--primary-color);
+  box-shadow: inset 0 -2px 0 var(--primary-color);
+}
+
+.input-panel {
+  padding: 20px;
+}
+
+.main-input-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.subreddit-input-group {
+  flex: 2;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-input);
+}
+
+.input-prefix {
+  background-color: var(--bg-highlight);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  font-weight: 500;
+  border-right: 1px solid var(--border-color);
+}
+
+.main-input {
+  flex: 1;
+  border: none;
+  padding: 10px 12px;
+  font-size: 1rem;
+  background: transparent;
+}
+
+.sort-select,
+.search-input,
+.scope-select {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-input);
+}
+
+.search-input {
+  flex: 3;
+  min-width: 250px;
+}
+
+.scope-select {
+  min-width: 140px;
+}
+
+.limit-input-group {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-input);
+}
+
+.limit-input-group input {
+  width: 50px;
+  border: none;
+  text-align: center;
+  padding: 10px 0;
+  background: transparent;
+}
+
+.limit-label {
+  padding: 0 10px 0 5px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.fetch-button,
+.search-button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.fetch-button:hover:not(:disabled),
+.search-button:hover:not(:disabled) {
+  background-color: var(--primary-darker);
+}
+
+.fetch-button:disabled,
+.search-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.multi-sub-row {
+  margin-bottom: 15px;
+}
+
+.multi-sub-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-input);
+}
+
+.extra-options,
+.search-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.search-option,
+.comment-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-option label,
+.comment-option label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+`;
+document.head.appendChild(styleTag);
+
 window.RedditScraper = RedditScraper;
