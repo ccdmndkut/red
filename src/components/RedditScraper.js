@@ -59,6 +59,9 @@ function RedditScraper() {
     const accessTokenRef = useRef(null);
     const tokenExpiryRef = useRef(0);
 
+    // Add a loading progress state
+    const [loadingProgress, setLoadingProgress] = useState({ loaded: 0, total: 0 });
+
     // --- Effects ---
 
     // Save credentials to localStorage
@@ -136,7 +139,7 @@ function RedditScraper() {
         if (!sub) { setError('Please enter a subreddit name.'); return; }
         if (!credentials.clientId || !credentials.clientSecret) { setError('API Credentials required.'); setShowAuthModal(true); return; }
         const numericLimit = parseInt(limit, 10);
-        if (isNaN(numericLimit) || numericLimit < 1 || numericLimit > 100) { setError('Post limit must be between 1 and 100.'); return; }
+        if (isNaN(numericLimit) || numericLimit < 10 || numericLimit > 1000) { setError('Post limit must be between 10 and 1000.'); return; }
 
         if (!loadMore) {
             setIsLoading(true);
@@ -146,9 +149,11 @@ function RedditScraper() {
             setAfterToken(''); // Reset pagination token
             setHasMorePosts(false);
             setSearchQuery(''); // Clear search when fetching normally
+            setLoadingProgress({ loaded: 0, total: numericLimit });
         } else {
             setIsLoading(true);
             setError('');
+            setLoadingProgress({ loaded: 0, total: numericLimit });
         }
 
         console.log(`Fetching posts from r/${sub}, Sort: ${sort}, Limit: ${numericLimit}, Timeframe (if top): ${topTimeFrame}${loadMore ? ', After: ' + afterToken : ''}`);
@@ -156,61 +161,98 @@ function RedditScraper() {
         try {
             const accessToken = await getAccessToken();
             const baseRedditUrl = 'https://oauth.reddit.com'; // Use OAuth endpoint
-            let apiUrl;
 
-            const afterParam = loadMore && afterToken ? `&after=${afterToken}` : '';
+            // Calculate remaining posts to fetch
+            let remainingToFetch = loadMore ? numericLimit : numericLimit;
+            let currentAfterToken = loadMore ? afterToken : '';
+            let allNewPosts = [];
 
-            if (sort === 'top' || sort === 'controversial') {
-                apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${numericLimit}&t=${topTimeFrame}${afterParam}&raw_json=1`;
-            } else {
-                apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${numericLimit}${afterParam}&raw_json=1`;
-            }
+            // Reddit API has a maximum of 100 posts per request
+            // Loop until we get the desired number of posts or there are no more posts
+            while (remainingToFetch > 0 && (currentAfterToken !== null || allNewPosts.length === 0)) {
+                // Calculate batch size (max 100 per API request)
+                const batchSize = Math.min(remainingToFetch, 100);
 
-            const response = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'User-Agent': 'ReactRedditScraper/3.0 by YourUsername',
+                let apiUrl;
+                const afterParam = currentAfterToken ? `&after=${currentAfterToken}` : '';
+
+                if (sort === 'top' || sort === 'controversial') {
+                    apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${batchSize}&t=${topTimeFrame}${afterParam}&raw_json=1`;
+                } else {
+                    apiUrl = `${baseRedditUrl}/r/${sub}/${sort}?limit=${batchSize}${afterParam}&raw_json=1`;
                 }
-            });
 
-            if (!response.ok) {
-                let errorMsg = `API Error (${response.status})`;
-                try {
-                    const errorData = await response.json();
-                    console.error('Reddit API Error (Posts):', errorData);
-                    if (response.status === 404) errorMsg = `Subreddit 'r/${sub}' not found or private.`;
-                    else if (response.status === 403) errorMsg = `Access denied to 'r/${sub}' (private/quarantined?).`;
-                    else errorMsg = `(${response.status}): ${errorData.message || 'API error fetching posts'}`;
-                } catch (jsonError) {
-                    errorMsg = `(${response.status}) ${response.statusText || 'Failed to fetch posts'}`;
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'User-Agent': 'ReactRedditScraper/3.0 by YourUsername',
+                    }
+                });
+
+                if (!response.ok) {
+                    let errorMsg = `API Error (${response.status})`;
+                    try {
+                        const errorData = await response.json();
+                        console.error('Reddit API Error (Posts):', errorData);
+                        if (response.status === 404) errorMsg = `Subreddit 'r/${sub}' not found or private.`;
+                        else if (response.status === 403) errorMsg = `Access denied to 'r/${sub}' (private/quarantined?).`;
+                        else errorMsg = `(${response.status}): ${errorData.message || 'API error fetching posts'}`;
+                    } catch (jsonError) {
+                        errorMsg = `(${response.status}) ${response.statusText || 'Failed to fetch posts'}`;
+                    }
+                    throw new Error(errorMsg);
                 }
-                throw new Error(errorMsg);
+
+                const data = await response.json();
+                if (!data?.data?.children) {
+                    console.error('Unexpected API response structure:', data);
+                    throw new Error('Unexpected API response structure from Reddit.');
+                }
+
+                // Process posts: Add default states needed by the UI
+                const batchPosts = data.data.children.map(child => ({
+                    ...child.data,
+                    isExpanded: false,      // For long text expansion
+                    comments: [],           // Store fetched comments
+                    commentsLoading: false, // Loading state for *this* post's comments
+                    showComments: false,    // Visibility state for *this* post's comments
+                    commentsError: null     // Error state for *this* post's comments
+                }));
+
+                // Add this batch to our collection
+                allNewPosts = [...allNewPosts, ...batchPosts];
+
+                // Update progress
+                setLoadingProgress(prev => ({
+                    loaded: allNewPosts.length,
+                    total: numericLimit
+                }));
+
+                // Update remaining count
+                remainingToFetch -= batchPosts.length;
+
+                // Update after token for next batch (if needed)
+                currentAfterToken = data.data.after;
+
+                // If no more posts are available or we've reached our limit, exit loop
+                if (!currentAfterToken || batchPosts.length === 0) {
+                    break;
+                }
+
+                // Optional: add a small delay between requests to avoid rate limiting
+                if (remainingToFetch > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
             }
 
-            const data = await response.json();
-            if (!data?.data?.children) {
-                console.error('Unexpected API response structure:', data);
-                throw new Error('Unexpected API response structure from Reddit.');
-            }
-
-            // Process posts: Add default states needed by the UI
-            const newPosts = data.data.children.map(child => ({
-                ...child.data,
-                isExpanded: false,      // For long text expansion
-                comments: [],           // Store fetched comments
-                commentsLoading: false, // Loading state for *this* post's comments
-                showComments: false,    // Visibility state for *this* post's comments
-                commentsError: null     // Error state for *this* post's comments
-            }));
-
-            // Store the "after" token for pagination
-            setAfterToken(data.data.after || '');
-            setHasMorePosts(!!data.data.after);
+            // Store the last "after" token for pagination
+            setAfterToken(currentAfterToken || '');
+            setHasMorePosts(!!currentAfterToken);
 
             // Append new posts to existing ones if loading more
-            setPosts(prevPosts => loadMore ? [...prevPosts, ...newPosts] : newPosts);
+            setPosts(prevPosts => loadMore ? [...prevPosts, ...allNewPosts] : allNewPosts);
 
-            console.log(`Fetched ${newPosts.length} posts. ${data.data.after ? 'More available.' : 'No more posts.'}`);
+            console.log(`Fetched ${allNewPosts.length} posts. ${currentAfterToken ? 'More available.' : 'No more posts.'}`);
 
         } catch (err) {
             console.error("Fetch posts error:", err);
@@ -220,6 +262,7 @@ function RedditScraper() {
             }
         } finally {
             setIsLoading(false);
+            setLoadingProgress({ loaded: 0, total: 0 }); // Reset progress
         }
     }, [subreddit, limit, sort, topTimeFrame, credentials, getAccessToken, error, afterToken]); // Include afterToken dependency
 
@@ -230,7 +273,7 @@ function RedditScraper() {
         if (!query) { setError('Please enter a search query.'); return; }
         if (!credentials.clientId || !credentials.clientSecret) { setError('API Credentials required.'); setShowAuthModal(true); return; }
         const numericLimit = parseInt(limit, 10);
-        if (isNaN(numericLimit) || numericLimit < 1 || numericLimit > 100) { setError('Result limit must be between 1 and 100.'); return; }
+        if (isNaN(numericLimit) || numericLimit < 10 || numericLimit > 1000) { setError('Result limit must be between 10 and 1000.'); return; }
 
         let targetSubreddits = '';
         let restrictSr = false;
@@ -251,9 +294,11 @@ function RedditScraper() {
             setSelectedPosts(new Set());
             setAfterToken(''); // Reset pagination token
             setHasMorePosts(false);
+            setLoadingProgress({ loaded: 0, total: numericLimit });
         } else {
             setIsLoading(true);
             setError('');
+            setLoadingProgress({ loaded: 0, total: numericLimit });
         }
 
         console.log(`Searching Reddit. Scope: ${searchScope}, Query: "${query}", Sort: ${searchSort}, Limit: ${numericLimit}, Time: ${searchTimeLimit}${loadMore ? ', After: ' + afterToken : ''}`);
@@ -263,71 +308,107 @@ function RedditScraper() {
             const baseRedditUrl = 'https://oauth.reddit.com';
             const timeParam = searchTimeLimit !== 'all' ? `&t=${searchTimeLimit}` : '';
             const queryParam = `q=${encodeURIComponent(query)}`;
-            const limitParam = `&limit=${numericLimit}`;
             const sortParam = `&sort=${searchSort}`;
             const rawJsonParam = '&raw_json=1';
-            const afterParam = loadMore && afterToken ? `&after=${afterToken}` : '';
-            let apiUrl;
 
-            if (searchScope === 'subreddit') {
-                // Search within a specific subreddit
-                apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}&restrict_sr=1${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
-            } else if (searchScope === 'multiple') {
-                // Search within multiple subreddits (no restrict_sr needed here)
-                apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
-                // Note: The behavior of sort=relevance might differ across multiple subs vs global search
-            } else { // searchScope === 'all'
-                // Search across all of Reddit
-                apiUrl = `${baseRedditUrl}/search?${queryParam}${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
-            }
+            // Calculate remaining posts to fetch
+            let remainingToFetch = loadMore ? numericLimit : numericLimit;
+            let currentAfterToken = loadMore ? afterToken : '';
+            let allSearchResults = [];
 
-            console.log("Search API URL:", apiUrl);
+            // Loop until we get the desired number of posts or there are no more results
+            while (remainingToFetch > 0 && (currentAfterToken !== null || allSearchResults.length === 0)) {
+                // Calculate batch size (max 100 per API request)
+                const batchSize = Math.min(remainingToFetch, 100);
+                const limitParam = `&limit=${batchSize}`;
+                const afterParam = currentAfterToken ? `&after=${currentAfterToken}` : '';
+                let apiUrl;
 
-            const response = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'User-Agent': 'ReactRedditScraper/3.0 by YourUsername',
+                if (searchScope === 'subreddit') {
+                    // Search within a specific subreddit
+                    apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}&restrict_sr=1${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
+                } else if (searchScope === 'multiple') {
+                    // Search within multiple subreddits (no restrict_sr needed here)
+                    apiUrl = `${baseRedditUrl}/r/${targetSubreddits}/search?${queryParam}${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
+                    // Note: The behavior of sort=relevance might differ across multiple subs vs global search
+                } else { // searchScope === 'all'
+                    // Search across all of Reddit
+                    apiUrl = `${baseRedditUrl}/search?${queryParam}${limitParam}${sortParam}${timeParam}${afterParam}${rawJsonParam}`;
                 }
-            });
 
-            if (!response.ok) {
-                let errorMsg = `Search API Error (${response.status})`;
-                try {
-                    const errorData = await response.json();
-                    console.error('Reddit API Error (Search):', errorData);
-                    if (response.status === 404 && (searchScope === 'subreddit' || searchScope === 'multiple')) errorMsg = `One or more specified subreddits not found or private.`;
-                    else if (response.status === 403) errorMsg = `Access denied to search endpoint or specified subreddits.`;
-                    else errorMsg = `(${response.status}): ${errorData.message || 'API error during search'}`;
-                } catch (jsonError) {
-                    errorMsg = `(${response.status}) ${response.statusText || 'Failed to perform search'}`;
+                console.log("Search API URL:", apiUrl);
+
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'User-Agent': 'ReactRedditScraper/3.0 by YourUsername',
+                    }
+                });
+
+                if (!response.ok) {
+                    let errorMsg = `Search API Error (${response.status})`;
+                    try {
+                        const errorData = await response.json();
+                        console.error('Reddit API Error (Search):', errorData);
+                        if (response.status === 404 && (searchScope === 'subreddit' || searchScope === 'multiple')) errorMsg = `One or more specified subreddits not found or private.`;
+                        else if (response.status === 403) errorMsg = `Access denied to search endpoint or specified subreddits.`;
+                        else errorMsg = `(${response.status}): ${errorData.message || 'API error during search'}`;
+                    } catch (jsonError) {
+                        errorMsg = `(${response.status}) ${response.statusText || 'Failed to perform search'}`;
+                    }
+                    throw new Error(errorMsg);
                 }
-                throw new Error(errorMsg);
+
+                const data = await response.json();
+                if (!data?.data?.children) {
+                    console.error('Unexpected API response structure for search:', data);
+                    throw new Error('Unexpected API response structure from Reddit search.');
+                }
+
+                // Process search results (same structure as regular posts)
+                const batchResults = data.data.children.map(child => ({
+                    ...child.data,
+                    isExpanded: false,
+                    comments: [],
+                    commentsLoading: false,
+                    showComments: false,
+                    commentsError: null
+                }));
+
+                // Add this batch to our collection
+                allSearchResults = [...allSearchResults, ...batchResults];
+
+                // Update progress
+                setLoadingProgress(prev => ({
+                    loaded: allSearchResults.length,
+                    total: numericLimit
+                }));
+
+                // Update remaining count
+                remainingToFetch -= batchResults.length;
+
+                // Update after token for next batch (if needed)
+                currentAfterToken = data.data.after;
+
+                // If no more posts are available or we've reached our limit, exit loop
+                if (!currentAfterToken || batchResults.length === 0) {
+                    break;
+                }
+
+                // Optional: add a small delay between requests to avoid rate limiting
+                if (remainingToFetch > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
             }
 
-            const data = await response.json();
-            if (!data?.data?.children) {
-                console.error('Unexpected API response structure for search:', data);
-                throw new Error('Unexpected API response structure from Reddit search.');
-            }
-
-            // Process search results (same structure as regular posts)
-            const searchResults = data.data.children.map(child => ({
-                ...child.data,
-                isExpanded: false,
-                comments: [],
-                commentsLoading: false,
-                showComments: false,
-                commentsError: null
-            }));
-
-            // Store the "after" token for pagination
-            setAfterToken(data.data.after || '');
-            setHasMorePosts(!!data.data.after);
+            // Store the last "after" token for pagination
+            setAfterToken(currentAfterToken || '');
+            setHasMorePosts(!!currentAfterToken);
 
             // Append new posts to existing ones if loading more
-            setPosts(prevPosts => loadMore ? [...prevPosts, ...searchResults] : searchResults);
+            setPosts(prevPosts => loadMore ? [...prevPosts, ...allSearchResults] : allSearchResults);
 
-            console.log(`Found ${searchResults.length} search results. ${data.data.after ? 'More available.' : 'No more results.'}`);
+            console.log(`Found ${allSearchResults.length} search results. ${currentAfterToken ? 'More available.' : 'No more results.'}`);
 
         } catch (err) {
             console.error("Search error:", err);
@@ -336,6 +417,7 @@ function RedditScraper() {
             }
         } finally {
             setIsLoading(false);
+            setLoadingProgress({ loaded: 0, total: 0 }); // Reset progress
         }
     }, [searchQuery, limit, searchScope, subreddit, multipleSubreddits, searchSort, searchTimeLimit, credentials, getAccessToken, error, afterToken]);
 
@@ -1227,21 +1309,30 @@ function RedditScraper() {
                                         <input
                                             type="number"
                                             value={limit}
-                                            onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
-                                            min="1" max="100" step="1"
+                                            onChange={(e) => setLimit(Math.max(10, Math.min(1000, parseInt(e.target.value, 10) || 10)))}
+                                            min="10" max="1000" step="10"
                                             onKeyDown={(e) => e.key === 'Enter' && fetchPosts()}
                                             disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                            title="Set number of posts to fetch (10-1000). Values over 100 will be retrieved in batches automatically."
                                         />
-                                        <span className="limit-label">posts</span>
+                                        <span className="limit-label" title="Set number of posts to fetch (10-1000). Values over 100 will be retrieved in batches automatically.">posts (10-1000)</span>
                                     </div>
 
                                     <button
-                                        className="fetch-button"
+                                        className={`fetch-button ${isLoading && !searchQuery ? 'loading' : ''}`}
                                         onClick={fetchPosts}
                                         disabled={isLoading || isCommentsLoading || isMediaDownloading || !subreddit.trim()}
                                     >
                                         {isLoading && !searchQuery ? (
-                                            <><span className="spinner"></span>Loading...</>
+                                            <>
+                                                <span className="spinner"></span>
+                                                {loadingProgress.loaded > 0 ? `Loading ${loadingProgress.loaded}/${loadingProgress.total}...` : 'Loading...'}
+                                                {loadingProgress.loaded > 0 && (
+                                                    <div className="loading-progress-container">
+                                                        <div className="loading-progress-bar" style={{ width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%` }}></div>
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : (
                                             <>Fetch Posts</>
                                         )}
@@ -1280,12 +1371,20 @@ function RedditScraper() {
                                     </select>
 
                                     <button
-                                        className="search-button"
+                                        className={`search-button ${isLoading && searchQuery ? 'loading' : ''}`}
                                         onClick={searchReddit}
                                         disabled={isLoading || isCommentsLoading || isMediaDownloading || !searchQuery.trim() || (searchScope === 'subreddit' && !subreddit.trim()) || (searchScope === 'multiple' && !multipleSubreddits.trim().split(',').map(s => s.trim()).filter(s => s).length)}
                                     >
                                         {isLoading && searchQuery ? (
-                                            <><span className="spinner"></span>Searching...</>
+                                            <>
+                                                <span className="spinner"></span>
+                                                {loadingProgress.loaded > 0 ? `Searching ${loadingProgress.loaded}/${loadingProgress.total}...` : 'Searching...'}
+                                                {loadingProgress.loaded > 0 && (
+                                                    <div className="loading-progress-container">
+                                                        <div className="loading-progress-bar" style={{ width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%` }}></div>
+                                                    </div>
+                                                )}
+                                            </>
                                         ) : (
                                             <>🔍 Search</>
                                         )}
@@ -1334,10 +1433,12 @@ function RedditScraper() {
                                         <input
                                             type="number"
                                             value={limit}
-                                            onChange={(e) => setLimit(Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 1)))}
-                                            min="1" max="100" step="1"
+                                            onChange={(e) => setLimit(Math.max(10, Math.min(1000, parseInt(e.target.value, 10) || 10)))}
+                                            min="10" max="1000" step="10"
                                             disabled={isLoading || isCommentsLoading || isMediaDownloading}
+                                            title="Set number of posts to fetch (10-1000). Values over 100 will be retrieved in batches automatically."
                                         />
+                                        <span className="limit-help" title="Values over 100 will be fetched in batches">10-1000</span>
                                     </div>
                                 </div>
                             </div>
@@ -1566,11 +1667,22 @@ function RedditScraper() {
             {posts.length > 0 && hasMorePosts && (
                 <div className="load-more-container">
                     <button
-                        className="load-more-button"
+                        className={`load-more-button ${isLoading ? 'loading' : ''}`}
                         onClick={() => searchQuery.trim() ? searchReddit(true) : fetchPosts(true)}
                         disabled={isLoading || isCommentsLoading || isMediaDownloading}
                     >
-                        {isLoading ? 'Loading...' : 'Load More Posts'}
+                        {isLoading ? (
+                            <>
+                                {loadingProgress.loaded > 0 ? `Loading ${loadingProgress.loaded}/${loadingProgress.total}...` : 'Loading...'}
+                                {loadingProgress.loaded > 0 && (
+                                    <div className="loading-progress-container">
+                                        <div className="loading-progress-bar" style={{ width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%` }}></div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            'Load More Posts'
+                        )}
                     </button>
                 </div>
             )}

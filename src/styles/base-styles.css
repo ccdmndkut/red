@@ -20,6 +20,24 @@
     --input-border: #444;
     --shadow-color: rgba(0, 0, 0, 0.4);
 
+    /* Button Colors */
+    --button-primary: var(--accent-primary);
+    --button-hover: var(--accent-primary-hover);
+    --button-disabled: #374151;
+
+    /* Primary Theme Color */
+    --primary-color: var(--accent-primary);
+
+    /* Tooltip Colors */
+    --bg-tooltip: rgba(0, 0, 0, 0.8);
+    --text-tooltip: #fff;
+
+    /* Background Colors */
+    --bg-highlight: rgba(255, 255, 255, 0.05);
+    --bg-hover: rgba(255, 255, 255, 0.08);
+    --bg-card: var(--bg-secondary);
+    --bg-input: var(--input-bg);
+
     /* iOS Safe Areas */
     --safe-area-inset-top: env(safe-area-inset-top, 0px);
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);

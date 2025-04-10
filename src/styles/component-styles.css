@@ -638,33 +638,78 @@ img[alt="thumb"] {
 /* Load more container and button */
 .load-more-container {
     display: flex;
-    justify-content: center;
-    margin: 20px 0 30px;
-    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px 0;
+    position: relative;
 }
 
 .load-more-button {
-    background-color: var(--accent-primary);
-    color: var(--text-on-accent);
+    padding: 10px 20px;
+    background-color: var(--button-primary);
+    color: white;
     border: none;
     border-radius: 4px;
-    padding: 10px 20px;
-    font-size: 16px;
-    font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    min-width: 180px;
+    position: relative;
 }
 
-.load-more-button:hover {
-    background-color: var(--accent-hover);
-}
-
-.load-more-button:active {
-    transform: scale(0.98);
+.load-more-button:hover:not(:disabled) {
+    background-color: var(--button-hover);
 }
 
 .load-more-button:disabled {
-    background-color: var(--accent-disabled);
+    background-color: var(--button-disabled);
     cursor: not-allowed;
-    transform: none;
+}
+
+/* Progress indicator for batch loading */
+.load-more-button.loading,
+.fetch-button.loading,
+.search-button.loading {
+    position: relative;
+}
+
+.loading-progress-container {
+    position: absolute;
+    bottom: -6px;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.loading-progress-bar {
+    height: 100%;
+    background-color: var(--primary-color);
+    transition: width 0.3s ease-in-out;
+}
+
+/* Tooltip for loading progress */
+.loading-tooltip {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--bg-tooltip);
+    color: var(--text-tooltip);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+}
+
+.load-more-button:hover .loading-tooltip,
+.fetch-button:hover .loading-tooltip,
+.search-button:hover .loading-tooltip {
+    opacity: 1;
+    visibility: visible;
 }
