@@ -5,11 +5,12 @@ const { useState, useEffect, useCallback } = React;
 /**
  * An Instagram-style modal for viewing and navigating image/video galleries.
  */
-function GalleryModal({ galleryUrls, initialIndex = 0, onClose }) {
+function GalleryModal({ galleryUrls, initialIndex = 0, onClose, onMediaSelect = null }) {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [likeActive, setLikeActive] = useState(false);
     const [saveActive, setSaveActive] = useState(false);
     const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
+    const [selectedItems, setSelectedItems] = useState(new Set());
 
     // Validate input
     if (!galleryUrls || galleryUrls.length === 0) {
@@ -73,6 +74,35 @@ function GalleryModal({ galleryUrls, initialIndex = 0, onClose }) {
         setSaveActive(!saveActive);
     };
 
+    // Handle media item selection (Shift+Click)
+    const handleMediaClick = (e) => {
+        // Only process selection if shift key is pressed and onMediaSelect callback is provided
+        if (e.shiftKey && onMediaSelect) {
+            e.stopPropagation(); // Prevent double click from firing
+            const mediaItem = galleryUrls[currentIndex];
+
+            // Toggle selection of the current item
+            setSelectedItems(prevSelected => {
+                const newSelected = new Set(prevSelected);
+                if (newSelected.has(mediaItem.url)) {
+                    newSelected.delete(mediaItem.url);
+                } else {
+                    newSelected.add(mediaItem.url);
+                }
+
+                // Call the onMediaSelect callback with the updated selection
+                onMediaSelect(Array.from(newSelected).map(url =>
+                    galleryUrls.find(item => item.url === url)
+                ));
+
+                return newSelected;
+            });
+        } else {
+            // Regular double-tap/click behavior
+            handleDoubleTap(e);
+        }
+    };
+
     // Get current media item safely
     const currentMedia = galleryUrls[currentIndex];
     if (!currentMedia || !currentMedia.url) {
@@ -92,6 +122,9 @@ function GalleryModal({ galleryUrls, initialIndex = 0, onClose }) {
     const isVideo = currentMedia.type === 'video' ||
         currentMedia.url?.endsWith('.mp4') ||
         currentMedia.url?.includes('v.redd.it');
+
+    // Check if current item is selected
+    const isSelected = selectedItems.has(currentMedia.url);
 
     return (
         <div className="modal instagram-modal" onClick={handleBackgroundClick}>
@@ -121,9 +154,18 @@ function GalleryModal({ galleryUrls, initialIndex = 0, onClose }) {
                 {/* Main viewer area */}
                 <div className="instagram-viewer">
                     <div
-                        className="instagram-main-image"
-                        onDoubleClick={handleDoubleTap}
+                        className={`instagram-main-image ${isSelected ? 'selected' : ''}`}
+                        onClick={handleMediaClick}
                     >
+                        {/* Selection indicator */}
+                        {isSelected && (
+                            <div className="instagram-media-selected-indicator">
+                                <svg viewBox="0 0 24 24" width="24" height="24">
+                                    <path fill="#ffffff" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"></path>
+                                </svg>
+                            </div>
+                        )}
+
                         {/* Double tap heart animation */}
                         {showDoubleTapHeart && (
                             <div className="instagram-double-tap-heart">
@@ -178,7 +220,7 @@ function GalleryModal({ galleryUrls, initialIndex = 0, onClose }) {
                             {galleryUrls.map((_, index) => (
                                 <div
                                     key={index}
-                                    className={`instagram-dot ${index === currentIndex ? 'active' : ''}`}
+                                    className={`instagram-dot ${index === currentIndex ? 'active' : ''} ${selectedItems.has(galleryUrls[index].url) ? 'selected' : ''}`}
                                     onClick={(e) => { e.stopPropagation(); setCurrentIndex(index); }}
                                 ></div>
                             ))}
@@ -228,6 +270,11 @@ function GalleryModal({ galleryUrls, initialIndex = 0, onClose }) {
                                     </svg>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Selection instructions */}
+                        <div className="instagram-selection-help">
+                            Hold Shift + Click to select media for download
                         </div>
 
                         {/* Likes count */}

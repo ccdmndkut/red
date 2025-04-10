@@ -38,6 +38,7 @@ function RedditScraper() {
     const [showGalleryModal, setShowGalleryModal] = useState(false);
     const [galleryUrls, setGalleryUrls] = useState([]); // Array of {url, type, id, thumbnail}
     const [initialGalleryIndex, setInitialGalleryIndex] = useState(0);
+    const [gallerySelectedMedia, setGallerySelectedMedia] = useState([]); // Store selected gallery media items
 
     // Media Grid State
     const [gridSize, setGridSize] = useState(160);
@@ -535,8 +536,51 @@ function RedditScraper() {
         setGalleryUrls(mediaInfo.items); // Set the items for the modal
         setInitialGalleryIndex(index);   // Set the starting image/video
         setShowGalleryModal(true);       // Show the modal
+
+        // Reset gallery selections when opening a new gallery
+        setGallerySelectedMedia([]);
     }, []);
 
+    // Handle media selection from the gallery modal
+    const handleGalleryMediaSelect = useCallback((selectedMediaItems) => {
+        console.log(`Gallery media selection updated: ${selectedMediaItems.length} items selected`);
+        setGallerySelectedMedia(selectedMediaItems);
+    }, []);
+
+    // Add selected gallery media to download selection
+    const addGallerySelectionToDownload = useCallback(() => {
+        if (gallerySelectedMedia.length === 0) {
+            alert("No media items selected in the gallery. Hold Shift + Click to select items.");
+            return;
+        }
+
+        // Find posts that contain the selected media URLs
+        const mediaUrls = new Set(gallerySelectedMedia.map(item => item.url));
+        const postsToAdd = posts.filter(post => {
+            const mediaInfo = getMediaInfo(post);
+            if (mediaInfo?.type === 'gallery' && mediaInfo?.items) {
+                // Check if any of the gallery items match our selected URLs
+                return mediaInfo.items.some(item => mediaUrls.has(item.url));
+            }
+            return false;
+        });
+
+        if (postsToAdd.length === 0) {
+            alert("Could not find posts containing the selected media items.");
+            return;
+        }
+
+        // Add the post IDs to the selected posts set
+        setSelectedPosts(prev => {
+            const newSelection = new Set(prev);
+            postsToAdd.forEach(post => newSelection.add(post.id));
+            return newSelection;
+        });
+
+        console.log(`Added ${postsToAdd.length} posts containing selected gallery media to download selection`);
+        setShowGalleryModal(false); // Close the gallery modal
+        setGallerySelectedMedia([]); // Clear gallery selection
+    }, [gallerySelectedMedia, posts, getMediaInfo]);
 
     // Fetch Comments for a Single Post
     const fetchCommentsForPost = useCallback(async (postId) => {
@@ -1074,7 +1118,20 @@ function RedditScraper() {
                     galleryUrls={galleryUrls}
                     initialIndex={initialGalleryIndex}
                     onClose={() => setShowGalleryModal(false)}
+                    onMediaSelect={handleGalleryMediaSelect}
                 />
+            )}
+
+            {/* Add button to add selected gallery items to download selection */}
+            {showGalleryModal && gallerySelectedMedia.length > 0 && (
+                <div className="gallery-selection-action">
+                    <button
+                        className="add-gallery-selection-btn"
+                        onClick={addGallerySelectionToDownload}
+                    >
+                        Add {gallerySelectedMedia.length} selected items to download ({selectedPosts.size} posts selected)
+                    </button>
+                </div>
             )}
 
             {/* --- Main Controls Card --- */}
