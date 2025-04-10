@@ -4,6 +4,7 @@ var AIChatInterface = function (props) {
     // Use plain React.useState for state management
     var redditDataState = React.useState(props.redditData);
     var redditData = redditDataState[0];
+    var setRedditData = redditDataState[1];
 
     var chatHistoryState = React.useState([]);
     var chatHistory = chatHistoryState[0];
@@ -58,7 +59,9 @@ var AIChatInterface = function (props) {
 
     // Helper function to prepare data context
     function prepareDataContext(data) {
-        if (!data) return "No data available";
+        if (!data || (Array.isArray(data) && data.length === 0)) {
+            return "No Reddit posts have been loaded yet. Please fetch posts from a subreddit first.";
+        }
 
         try {
             // If data is too large, create a summary instead of sending everything
@@ -135,6 +138,11 @@ var AIChatInterface = function (props) {
             });
     }
 
+    // Update redditData when props change
+    React.useEffect(function () {
+        setRedditData(props.redditData);
+    }, [props.redditData]);
+
     // Create the component UI without JSX
     return React.createElement('div', { className: 'card main-controls ai-chat-section' }, [
         // Header with title and API key input
@@ -168,6 +176,22 @@ var AIChatInterface = function (props) {
 
         // Chat interface
         React.createElement('div', { key: 'chat-interface', className: 'chat-interface' }, [
+            // Data status indicator
+            Array.isArray(redditData) && redditData.length === 0 ?
+                React.createElement('div', {
+                    key: 'no-data',
+                    className: 'no-data-warning',
+                    style: {
+                        padding: '10px',
+                        margin: '10px 0',
+                        backgroundColor: '#fff3cd',
+                        color: '#856404',
+                        borderRadius: '5px',
+                        textAlign: 'center',
+                        border: '1px solid #ffeeba'
+                    }
+                }, 'No Reddit posts loaded. Please fetch posts from a subreddit before using the AI chat.') : null,
+
             // Chat messages
             React.createElement('div', { key: 'messages', className: 'chat-messages' },
                 chatHistory.length === 0
@@ -204,8 +228,12 @@ var AIChatInterface = function (props) {
                 React.createElement('button', {
                     key: 'send-btn',
                     onClick: sendMessage,
-                    disabled: !apiKey || !userInput.trim() || isLoading,
-                    className: 'send-button'
+                    disabled: !apiKey || !userInput.trim() || isLoading || (Array.isArray(redditData) && redditData.length === 0),
+                    className: 'send-button',
+                    title: !apiKey ? 'Please enter an API key' :
+                        !userInput.trim() ? 'Please enter a question' :
+                            (Array.isArray(redditData) && redditData.length === 0) ? 'Please fetch Reddit posts first' :
+                                'Send your question to the AI'
                 }, isLoading ? 'Sending...' : 'Send')
             ])
         ])
